@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>絵文字ファビコンエディター</title>
+    <link id="favicon" rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎨</text></svg>">
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 2em;
+            box-sizing: border-box;
+            min-height: 100vh;
+            background-color: #f8f9fa;
+            display: grid;
+            grid-template-columns: 1fr auto 350px 1fr;
+            grid-template-areas: ". editor controls .";
+            gap: 2em;
+            align-items: start;
+        }
+
+        .editor-container {
+            grid-area: editor;
+        }
+
+        .controls-container {
+            grid-area: controls;
+        }
+
+        .editor-container,
+        .controls-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1em;
+        }
+
+        #svg-editor {
+            border: 2px solid #ccc;
+            background-color: #fff;
+            width: 100%;
+            max-width: 500px;
+            aspect-ratio: 1 / 1;
+            cursor: default;
+            touch-action: none;
+        }
+
+        #svg-editor text {
+            cursor: grab;
+            user-select: none;
+        }
+
+        #svg-editor text.active {
+            cursor: grabbing;
+        }
+
+        #selection-indicator {
+            fill: none;
+            stroke: #007bff;
+            stroke-width: 1;
+            stroke-dasharray: 4 2;
+            pointer-events: none;
+        }
+
+        .control-group,
+        .output-group {
+            border: 1px solid #ddd;
+            padding: 1em;
+            border-radius: 8px;
+            background-color: #fff;
+        }
+
+        h2 {
+            margin-top: 0;
+        }
+
+        input[type="text"],
+        input[type="range"],
+        button,
+        textarea {
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 1rem;
+            padding: 0.5em;
+            margin-top: 0.5em;
+        }
+        
+        .output-group button + button,
+        .control-group button {
+            margin-top: 0.5em;
+        }
+        
+        textarea {
+            height: 8em;
+            resize: vertical;
+            font-family: monospace;
+        }
+
+        label {
+            display: block;
+            margin-top: 1em;
+        }
+
+        .emoji-link {
+            font-size: 0.9em;
+            text-align: center;
+            margin-top: 1em;
+        }
+
+        details {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fff;
+        }
+        
+        summary {
+            padding: 1em;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        details > div {
+            padding: 0 1em 1em;
+        }
+    </style>
+</head>
+<body>
+    <main class="editor-container">
+        <h2>エディター</h2>
+        <svg id="svg-editor" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <rect id="selection-indicator" visibility="hidden"></rect>
+        </svg>
+    </main>
+    <aside class="controls-container">
+        <details>
+            <summary>使い方</summary>
+            <div>
+                <p><strong>基本操作:</strong></p>
+                <ul>
+                    <li>絵文字やテキストを入力し「追加」ボタンでエディターに追加します。</li>
+                    <li>エディター上の絵文字はドラッグして移動できます。</li>
+                    <li>絵文字をクリックすると選択状態になり、サイズや回転を調整できます。</li>
+                    <li>別の場所をクリックすると選択が解除されます。</li>
+                </ul>
+                <p><strong>ロード機能:</strong></p>
+                <ul>
+                    <li>「SVGソース」で生成した文字列を下のロード欄に貼り付け、「読み込む」ボタンを押すと、エディターの状態を復元できます。（HTMLリンク形式とユーザースクリプト形式のロードには対応していません）</li>
+                </ul>
+                <p><strong>生成機能:</strong></p>
+                <ul>
+                    <li>用途に応じた形式のコードや画像を生成・ダウンロードできます。</li>
+                </ul>
+                <hr style="margin: 1.5em 0; border: none; border-top: 1px solid #ddd;">
+                 <p style="font-size: 0.9em;"></p>
+                  ※絵文字は、閲覧するOSやブラウザによってデザインが異なる場合があります。<br>
+                  このツールのソースコードは <a href="https://github.com/yofumin/emoji-favicon-editor" target="_blank" rel="noopener noreferrer">GitHub</a> で公開しています。
+                  </p>
+
+            </div>
+        </details>
+
+        <div class="control-group">
+            <h2>絵文字を追加</h2>
+            <input type="text" id="emoji-input" value="🚀">
+            <button id="add-button">追加</button>
+            <p class="emoji-link">
+                <a href="https://getemoji.com/" target="_blank" rel="noopener noreferrer">絵文字一覧はこちら (外部サイト)</a>
+            </p>
+        </div>
+        
+        <div id="selection-controls" class="control-group" style="display: none;">
+            <h2>選択中の絵文字</h2>
+            <label>サイズ: <span id="size-value">50</span></label>
+            <input type="range" id="size-slider" min="10" max="150" value="50">
+            <label>回転: <span id="rotation-value">0</span>°</label>
+            <input type="range" id="rotation-slider" min="-180" max="180" value="0">
+            <button id="delete-button" style="margin-top: 1em;">削除</button>
+        </div>
+
+        <div class="control-group">
+            <h2>ロード</h2>
+            <textarea id="load-input" placeholder="SVGソースを貼り付け"></textarea>
+            <button id="load-button">エディターに読み込む</button>
+        </div>
+        
+        <div class="output-group">
+            <h2>生成</h2>
+            <button id="generate-link-button">HTMLリンク用を生成</button>
+            <button id="generate-userscript-button">ユーザースクリプト用を生成</button>
+            <button id="generate-svg-source-button">SVGソースを生成</button>
+            <button id="generate-png-button">PNGをダウンロード</button>
+            <textarea id="output-textarea" readonly></textarea>
+        </div>
+    </aside>
+
+    <script>
+    // === DOM要素の取得 ===
+    const svgEditor = document.getElementById('svg-editor');
+    const selectionIndicator = document.getElementById('selection-indicator');
+    const emojiInput = document.getElementById('emoji-input');
+    const addButton = document.getElementById('add-button');
+    const generateLinkButton = document.getElementById('generate-link-button');
+    const generateUserscriptButton = document.getElementById('generate-userscript-button');
+    const generateSvgSourceButton = document.getElementById('generate-svg-source-button');
+    const generatePngButton = document.getElementById('generate-png-button');
+    const outputTextarea = document.getElementById('output-textarea');
+    const favicon = document.getElementById('favicon');
+    const selectionControls = document.getElementById('selection-controls');
+    const sizeSlider = document.getElementById('size-slider');
+    const sizeValue = document.getElementById('size-value');
+    const rotationSlider = document.getElementById('rotation-slider');
+    const rotationValue = document.getElementById('rotation-value');
+    const deleteButton = document.getElementById('delete-button');
+    const loadInput = document.getElementById('load-input');
+    const loadButton = document.getElementById('load-button');
+
+    // === 状態管理 ===
+    let emojis = [];
+    let activeState = { element: null, id: null, isDragging: false, startPoint: { x: 0, y: 0 }, startPos: { x: 0, y: 0 }};
+    let selectedId = null;
+
+    // === ユーティリティ関数 ===
+    const getSVGPoint = (event) => {
+        const pt = svgEditor.createSVGPoint();
+        pt.x = event.clientX;
+        pt.y = event.clientY;
+        return pt.matrixTransform(svgEditor.getScreenCTM().inverse());
+    };
+
+    const escapeXML = (str) => {
+        return str.replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;')
+                  .replace(/'/g, '&#39;');
+    };
+
+    const generateOptimizedSvgString = () => {
+        const textElements = emojis.map(emoji => {
+            const x = Math.round(emoji.x);
+            const y = Math.round(emoji.y);
+            const size = Math.round(emoji.size);
+            const rotation = Math.round(emoji.rotation);
+            let transformAttr = '';
+            if (rotation !== 0) {
+                transformAttr = ` transform="rotate(${rotation} ${x} ${y})"`;
+            }
+            return `<text x="${x}" y="${y}" font-size="${size}" text-anchor="middle"${transformAttr}>${escapeXML(emoji.char)}</text>`;
+        }).join('');
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${textElements}</svg>`;
+    };
+
+    const minimalEncode = (svgString) => {
+        return svgString.replace(/%/g, '%25').replace(/</g, '%3C').replace(/>/g, '%3E').replace(/#/g, '%23').replace(/&/g, '%26').replace(/'/g, '%27');
+    };
+    
+    // === レンダリング & 更新関数 ===
+    const render = () => {
+        svgEditor.querySelectorAll('text').forEach(el => el.remove());
+        let selectedEmoji = null;
+        emojis.forEach(emoji => {
+            const textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            textEl.setAttribute('x', emoji.x);
+            textEl.setAttribute('y', emoji.y);
+            textEl.setAttribute('font-size', emoji.size);
+            textEl.setAttribute('text-anchor', 'middle');
+            textEl.setAttribute('transform', `rotate(${emoji.rotation}, ${emoji.x}, ${emoji.y})`);
+            textEl.setAttribute('data-id', emoji.id);
+            textEl.textContent = emoji.char;
+            if (emoji.id === selectedId) selectedEmoji = textEl;
+            svgEditor.insertBefore(textEl, selectionIndicator);
+        });
+        if (selectedEmoji) {
+            const bbox = selectedEmoji.getBBox();
+            selectionIndicator.setAttribute('x', bbox.x);
+            selectionIndicator.setAttribute('y', bbox.y);
+            selectionIndicator.setAttribute('width', bbox.width);
+            selectionIndicator.setAttribute('height', bbox.height);
+            selectionIndicator.setAttribute('visibility', 'visible');
+        } else {
+            selectionIndicator.setAttribute('visibility', 'hidden');
+        }
+        updateFavicon();
+    };
+
+    const updateFavicon = () => {
+        const fullSvg = generateOptimizedSvgString();
+        favicon.href = `data:image/svg+xml,${minimalEncode(fullSvg)}`;
+    };
+
+    const updateSelectionControls = () => {
+        const emoji = emojis.find(em => em.id === selectedId);
+        if (emoji) {
+            selectionControls.style.display = 'block';
+            sizeSlider.value = emoji.size;
+            sizeValue.textContent = Math.round(emoji.size);
+            rotationSlider.value = emoji.rotation;
+            rotationValue.textContent = Math.round(emoji.rotation);
+        } else {
+            selectionControls.style.display = 'none';
+        }
+    };
+    
+    // === イベントリスナー ===
+    
+    // --- 生成系ボタン ---
+    generateLinkButton.addEventListener('click', () => {
+        const fullSvg = generateOptimizedSvgString();
+        const dataUrl = `data:image/svg+xml,${minimalEncode(fullSvg)}`;
+        const linkTag = `<link rel='icon' href='${dataUrl}'>`;
+        outputTextarea.value = linkTag;
+        outputTextarea.select();
+    });
+
+    generateUserscriptButton.addEventListener('click', () => {
+        const fullSvg = generateOptimizedSvgString();
+        const cleanSvg = fullSvg.replace(/[\r\n]/g, '');
+        const userscriptLine = `// @icon data:image/svg+xml,${cleanSvg}`;
+        outputTextarea.value = userscriptLine;
+        outputTextarea.select();
+    });
+
+    generateSvgSourceButton.addEventListener('click', () => {
+        const svgString = generateOptimizedSvgString();
+        outputTextarea.value = svgString;
+        outputTextarea.select();
+    });
+
+    generatePngButton.addEventListener('click', () => {
+        const svgString = generateOptimizedSvgString();
+        const img = new Image();
+        img.src = "data:image/svg+xml," + minimalEncode(svgString);
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const size = 256;
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, size, size);
+            const pngUrl = canvas.toDataURL('image/png');
+            const a = document.createElement('a');
+            a.href = pngUrl;
+            a.download = "favicon.png";
+            a.click();
+        };
+        img.onerror = () => {
+            console.error("PNG生成のための一時的な画像の読み込みに失敗しました。");
+            alert("PNGの生成に失敗しました。");
+        };
+    });
+
+    // --- ロード機能 ---
+    loadButton.addEventListener('click', () => {
+        const input = loadInput.value.trim();
+        if (!input) return;
+
+        let svgString = '';
+
+        if (input.startsWith('<link')) {
+            // 現在はHTMLリンク形式のロードは非対応
+            alert('HTMLリンク形式のロードには対応していません。SVGソースを貼り付けてください。');
+            return;
+        } 
+        else if (input.startsWith('<svg')) {
+            svgString = input;
+        }
+
+        if (!svgString) {
+            alert('有効なSVGソースが見つかりませんでした。');
+            return;
+        }
+        
+        try {
+            const parser = new DOMParser();
+            const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
+            
+            if (svgDoc.querySelector('parsererror')) {
+                throw new Error('SVGのパースに失敗しました。');
+            }
+
+            const textElements = svgDoc.querySelectorAll('text');
+            const newEmojis = [];
+            
+            textElements.forEach((text, index) => {
+                const transform = text.getAttribute('transform');
+                let rotation = 0;
+                if (transform) {
+                    const rotMatch = transform.match(/rotate\(([-.\d]+)/);
+                    if (rotMatch && rotMatch[1]) {
+                        rotation = parseFloat(rotMatch[1]);
+                    }
+                }
+
+                newEmojis.push({
+                    id: Date.now() + index,
+                    char: text.textContent,
+                    x: parseFloat(text.getAttribute('x')),
+                    y: parseFloat(text.getAttribute('y')),
+                    size: parseFloat(text.getAttribute('font-size')),
+                    rotation: rotation
+                });
+            });
+
+            emojis = newEmojis;
+            selectedId = null;
+            updateSelectionControls();
+            render();
+            loadInput.value = '';
+
+        } catch (e) {
+            alert('SVGデータの読み込み中にエラーが発生しました。\n' + e.message);
+            console.error(e);
+        }
+    });
+
+    // --- エディター操作 ---
+    addButton.addEventListener('click', () => {
+        const char = emojiInput.value;
+        if (!char) return;
+        const newEmoji = { id: Date.now(), char: char, x: 50, y: 55, size: 50, rotation: 0 };
+        emojis.push(newEmoji);
+        selectedId = newEmoji.id;
+        updateSelectionControls();
+        render();
+    });
+    
+    deleteButton.addEventListener('click', () => {
+        if (selectedId === null) return;
+        emojis = emojis.filter(em => em.id !== selectedId);
+        selectedId = null;
+        updateSelectionControls();
+        render();
+    });
+    
+    svgEditor.addEventListener('mousedown', (e) => {
+        if (e.target.tagName === 'text') {
+            e.preventDefault();
+            const id = parseInt(e.target.getAttribute('data-id'));
+            activeState.element = e.target;
+            activeState.id = id;
+            activeState.isDragging = true;
+            activeState.startPoint = getSVGPoint(e);
+            const emoji = emojis.find(em => em.id === id);
+            activeState.startPos = { x: emoji.x, y: emoji.y };
+            e.target.classList.add('active');
+            selectedId = id;
+        } else {
+            selectedId = null;
+        }
+        updateSelectionControls();
+        render();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        if (!activeState.isDragging || !activeState.element) return;
+        const currentPoint = getSVGPoint(e);
+        const dx = currentPoint.x - activeState.startPoint.x;
+        const dy = currentPoint.y - activeState.startPoint.y;
+        const emoji = emojis.find(em => em.id === activeState.id);
+        if (emoji) {
+            emoji.x = activeState.startPos.x + dx;
+            emoji.y = activeState.startPos.y + dy;
+            render();
+        }
+    });
+
+    window.addEventListener('mouseup', () => {
+        if(activeState.element) activeState.element.classList.remove('active');
+        activeState.isDragging = false;
+        activeState.element = null;
+        activeState.id = null;
+    });
+    
+    sizeSlider.addEventListener('input', (e) => {
+        const emoji = emojis.find(em => em.id === selectedId);
+        if (emoji) {
+            emoji.size = e.target.value;
+            updateSelectionControls();
+            render();
+        }
+    });
+    
+    rotationSlider.addEventListener('input', (e) => {
+        const emoji = emojis.find(em => em.id === selectedId);
+        if (emoji) {
+            emoji.rotation = e.target.value;
+            updateSelectionControls();
+            render();
+        }
+    });
+
+    // === 初期化処理 ===
+    addButton.click();
+    </script>
+</body>
+</html>
