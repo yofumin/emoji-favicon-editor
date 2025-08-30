@@ -3,6 +3,7 @@
 ブラウザ上で簡単に、複数の絵文字やテキストを組み合わせたオリジナルのSVGファビコンを作成できるエディターです。
 
 [🎨 ここからすぐに使えます](https://yofumin.github.io/emoji-favicon-editor/)
+
 ![絵文字ファビコンエディターのスクリーンショット](screenshot.jpg)
 
 ## ✨ SVGファビコンの特徴
